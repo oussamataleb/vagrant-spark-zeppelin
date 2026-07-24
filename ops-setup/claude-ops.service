@@ -1,0 +1,38 @@
+# /etc/systemd/system/claude-ops.service
+# Lance Claude Code en Remote Control dans une session tmux "ops" au démarrage.
+#
+# AVANT DE COPIER, REMPLACER :
+#   __USER__       -> l'utilisateur qui possède ~/ops et qui a fait /login (ex. root)
+#   __HOME__       -> le home de cet utilisateur (ex. /root ou /home/xxx)
+#   __CLAUDE_BIN__ -> chemin absolu du binaire claude (`which claude`, ex. /usr/bin/claude)
+#   __TMUX_BIN__   -> chemin absolu de tmux (`which tmux`, ex. /usr/bin/tmux)
+#
+# NB1 : la commande headless est le sous-commande `claude remote-control`
+#       (mode serveur), et NON `claude --remote-control` (session interactive).
+# NB2 : un `/login` (OAuth claude.ai) doit avoir été fait AU PRÉALABLE ; les
+#       identifiants sont mis en cache dans __HOME__/.claude. Sans login, le
+#       service sortira en erreur.
+# NB3 : tmux daemonise : ExecStart se termine dès que le serveur tmux est lancé.
+#       Type=forking convient. Restart=on-failure se déclenche si le lancement de
+#       tmux échoue ; il ne détecte PAS un crash de claude *dans* le panneau.
+#       Voir RUNBOOK.md (étape 5) pour la variante Type=simple (sans tmux), plus
+#       robuste vis-à-vis des redémarrages automatiques.
+
+[Unit]
+Description=Claude Code Remote Control (ops) in tmux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=__USER__
+Environment=HOME=__HOME__
+WorkingDirectory=__HOME__/ops
+# Démarre une session tmux détachée nommée "ops" qui exécute claude en remote control
+ExecStart=__TMUX_BIN__ new-session -d -s ops '__CLAUDE_BIN__ remote-control --name "VPS ops"'
+ExecStop=__TMUX_BIN__ kill-session -t ops
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
